@@ -10,12 +10,15 @@
 -author("Luis Serapicos").
 
 %% API
--export([start/1]).
+-export([start/1, send_message_to_process/1, loop/0]).
 
 %% @doc Starts the server process.
 %% @param Server The name to register the server process under.
 %% @spec start(atom()) -> ok
 start(Server) -> register(Server,spawn(fun() -> loop() end)).
+
+send_message_to_process({ProcessName, Message}) ->
+  ProcessName ! Message.
 
 %% @doc The main loop of the server process.
 %% This function waits for messages and handles them as they arrive.
@@ -23,9 +26,13 @@ start(Server) -> register(Server,spawn(fun() -> loop() end)).
 %% If any other message is received, the server process sends a 'happy_to_receive_your_message' message back to the sender and then continues waiting for more messages.
 loop() ->
   receive
+    {From, get_pid} ->
+      From ! {server, self()},
+      loop();
     {From, stop} ->
       io:format("Received from ~p message to stop!~n",[From]),
-      From ! {self(),server_disconnect};
+      From ! {self(),server_disconnect},
+      exit(normal);  % exits the server process
     {From, Msg} ->
       io:format("Received ~p: ~p~n",[From,Msg]),
       io:format("Sending reply...~n"),

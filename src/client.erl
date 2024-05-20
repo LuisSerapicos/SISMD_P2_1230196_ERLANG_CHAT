@@ -15,7 +15,9 @@
 %% @doc Starts the client process.
 %% @param Client The name to register the client process under.
 %% @spec start(atom()) -> ok
-start(Client) -> register(Client,spawn(fun() -> loop() end)).
+start(Client) ->
+  Pid = spawn_link(fun() -> loop() end),
+  register(Client, Pid).
 
 %% @doc Adds a remote machine to the client's list of known machines.
 %% @param RemoteMachine The name of the remote machine to add.
@@ -29,8 +31,20 @@ add_remote(RemoteMachine) ->
 %% @param RemoteMachine The name of the remote machine.
 %% @param Message The message to send.
 %% @spec send_msg(atom(), atom(), atom(), any()) -> ok
-send_msg(Client,Server,RemoteMachine,Message)->
-  Client ! {send,Server,RemoteMachine,Message}.
+send_msg(Client, stop, RemoteMachine, _Message) ->
+  case whereis(Client) of
+    undefined ->
+      io:format("No process registered under ~p~n", [Client]);
+    _Pid ->
+      Client ! {stop, RemoteMachine}
+  end;
+send_msg(Client, Server, RemoteMachine, Message) ->
+  case whereis(Client) of
+    undefined ->
+      io:format("No process registered under ~p~n", [Client]);
+    _Pid ->
+      Client ! {send, Server, RemoteMachine, Message}
+  end.
 
 %% @doc Stops the client process.
 %% @param Client The name of the client process.
