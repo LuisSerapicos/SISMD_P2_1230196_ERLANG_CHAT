@@ -10,7 +10,7 @@
 -author("Luis Serapicos").
 
 %% API
--export([start/1,add_remote/1,send_msg/4,stop_client/1]).
+-export([start/1,add_remote/1,send_msg/4,leave/1]).
 
 %% @doc Starts the client process.
 %% @param Client The name to register the client process under.
@@ -46,11 +46,16 @@ send_msg(Client, Server, RemoteMachine, Message) ->
       Client ! {send, Server, RemoteMachine, Message}
   end.
 
-%% @doc Stops the client process.
+%% @doc Sends a leave message to the server.
 %% @param Client The name of the client process.
-%% @spec stop_client(atom()) -> ok
-stop_client(Client) ->
-  Client ! {stop_client}.
+%% @spec leave(atom()) -> ok
+leave(Client) ->
+  case whereis(Client) of
+    undefined ->
+      io:format("No process registered under ~p~n", [Client]);
+    _Pid ->
+      Client ! {leave}
+  end.
 
 %% @doc The main loop of the client process.
 %% This function waits for messages and handles them as they arrive.
@@ -65,5 +70,8 @@ loop() ->
       end,
       loop();
     {stop_client} ->
-      io:format("Cliente exiting...")
+      io:format("Cliente exiting...");
+    {leave} ->
+      io:format("Client leaving...~n"),
+      exit(normal)
   end.
