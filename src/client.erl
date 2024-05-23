@@ -10,14 +10,15 @@
 -author("Luis Serapicos").
 
 %% API
--export([start/1,add_remote/1,send_msg/4,leave/1]).
+-export([start/1, add_remote/1, send_msg/4, leave/1, connect/2]).
 
-%% @doc Starts the client process.
+%% @doc Starts the client process and registers it under the given name.
 %% @param Client The name to register the client process under.
-%% @spec start(atom()) -> ok
+%% @spec start(atom()) -> atom()
 start(Client) ->
   Pid = spawn_link(fun() -> loop() end),
-  register(Client, Pid).
+  register(Client, Pid),
+  {ok, Client}.
 
 %% @doc Adds a remote machine to the client's list of known machines.
 %% @param RemoteMachine The name of the remote machine to add.
@@ -57,21 +58,38 @@ leave(Client) ->
       Client ! {leave}
   end.
 
+%% @doc Connects the client to the server on the specified node.
+%% @param Server The name of the server process.
+%% @param Node The name of the node the server is running on.
+%% @spec connect(atom(), atom()) -> ok
+connect(Server, Node) ->
+  {ok, ClientName} = start(client),
+  case whereis(ClientName) of
+    undefined ->
+      io:format("Client not registered~n");
+    _Pid ->
+      {Server, Node} ! {ClientName, {connect, ClientName}},
+      io:format("Client ~p connecting to server ~p on node ~p~n", [ClientName, Server, Node])
+  end.
+
 %% @doc The main loop of the client process.
 %% This function waits for messages and handles them as they arrive.
 %% If a 'send' message is received, the client process sends the message to the specified server on the specified remote machine and then waits for a response.
 %% If a 'stop_client' message is received, the client process stops.
 loop() ->
   receive
-    {send,Server,RemoteMachine,Message} ->
-      {Server,RemoteMachine} ! {self(),Message},
+    {send, Server, RemoteMachine, Message} ->
+      {Server, RemoteMachine} ! {self(), Message},
       receive
-        {_,Reply} -> io:format("Received from server: ~p~n",[Reply])
+        {_, Reply} -> io:format("Received from server: ~p~n", [Reply])
       end,
       loop();
     {stop_client} ->
-      io:format("Cliente exiting...");
+      io:format("Client exiting..."),
+      exit(normal);
     {leave} ->
       io:format("Client leaving...~n"),
-      exit(normal)
+      exit(normal);
+    {connect, Server} ->
+      loop()
   end.
