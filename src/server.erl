@@ -10,7 +10,7 @@
 -author("Luis Serapicos").
 
 %% API
--export([start/1, loop/1]).
+-export([start/1, loop/2]).
 
 %% @doc Starts the server process and registers it under the given name.
 %% @param Server The name of the server process.
@@ -28,9 +28,9 @@ start(Server) ->
 %% Global is used to send messages to the router, because the router is registered globally on another node.
 init(Server) ->
   io:format("Server ~p started~n", [Server]),
-  {Messages, Clients} = load_state(),
+  {Messages, Clients} = load_state(Server),
   global:send(router, {state_restored, self()}),
-  loop({Messages, Clients}).
+  loop(Server, {Messages, Clients}).
 
 
 %% @doc The main loop of the server process.
@@ -40,32 +40,32 @@ init(Server) ->
 %% If the server receives a message to leave a client, it will remove the client from the list of clients.
 %% If the server receives a message from a client, it will save the message and update the state.
 %% If the server receives a message to restore state, it will restore the state and update the state.
-loop({Messages, Clients}) ->
+loop(Server, {Messages, Clients}) ->
   receive
     {restore_state, {NewMessages, NewClients}} ->
       io:format("Restoring state: Messages ~p, Clients ~p~n", [NewMessages, NewClients]),
-      loop({NewMessages, NewClients});
+      loop(Server, {NewMessages, NewClients});
     {From, get_pid} ->
       From ! {server, self()},
-      loop({Messages, Clients});
-    {From, {connect, ClientName}} ->
-      NewClients = lists:usort([ClientName | Clients]), % Unique client names
-      save_state({Messages, NewClients}),
-      io:format("Client connected: ~p~n", [ClientName]),
-      loop({Messages, NewClients});
-    {From, {leave, ClientName}} ->
-      NewClients = lists:delete(ClientName, Clients),
-      save_state({Messages, NewClients}),
-      io:format("Client left: ~p~n", [ClientName]),
-      loop({Messages, NewClients});
+      loop(Server, {Messages, Clients});
+    {From, {connect, Client}} ->
+      NewClients = lists:usort([Client | Clients]), % Unique client names
+      save_state(Server, {Messages, NewClients}),
+      io:format("Client connected: ~p~n", [Client]),
+      loop(Server, {Messages, NewClients});
+    {From, {leave, Client}} ->
+      NewClients = lists:delete(Client, Clients),
+      save_state(Server, {Messages, NewClients}),
+      io:format("Client left: ~p~n", [Client]),
+      loop(Server, {Messages, NewClients});
     {From, Msg} ->
       io:format("Received ~p: ~p~n", [From, Msg]),
       io:format("Sending reply...~n"),
       From ! {self(), happy_to_receive_your_message},
       %% Save the message and update the state
       NewMessages = [Msg | Messages],
-      save_state({NewMessages, Clients}),
-      loop({NewMessages, Clients});
+      save_state(Server, {NewMessages, Clients}),
+      loop(Server, {NewMessages, Clients});
     {From, stop} ->
       io:format("Received from ~p message to stop!~n", [From]),
       From ! {self(), server_disconnect},
@@ -77,12 +77,12 @@ loop({Messages, Clients}) ->
 %% @param State The state of the server.
 %% @spec save_state({list(), list()}) -> ok
 %% If the router is found, the function will send a message to the router to save the state.
-save_state({Messages, Clients}) ->
+save_state(ServerName, {Messages, Clients}) ->
   case global:whereis_name(router) of
     undefined ->
       io:format("Router not found, state not saved: Messages ~p, Clients ~p~n", [Messages, Clients]);
     Router ->
-      Router ! {save_state, {Messages, Clients}},
+      Router ! {save_state, ServerName, {Messages, Clients}},
       io:format("State saved: Messages ~p, Clients ~p~n", [Messages, Clients])
   end.
 
@@ -92,14 +92,14 @@ save_state({Messages, Clients}) ->
 %% If the router is not found, the function will retry every 5 seconds until the router is found.
 %% If the router is found, the function will send a message to the router to load the state.
 %% If the state is not received within 10 seconds, the function will initialize an empty state.
-load_state() ->
+load_state(ServerName) ->
   case global:whereis_name(router) of
     undefined ->
       io:format("Router not found, retrying in 5 seconds~n"),
       timer:sleep(5000),
-      load_state();
+      load_state(ServerName);
     Router ->
-      Router ! {load_state, self()},
+      Router ! {load_state, self(), ServerName},
       receive
         {state, {Messages, Clients}} ->
           io:format("Loaded state: Messages ~p, Clients ~p~n", [Messages, Clients]),

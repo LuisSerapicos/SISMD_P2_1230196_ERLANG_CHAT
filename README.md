@@ -2,6 +2,8 @@
 
 TheyChat is a fault-tolerant chat system built with Erlang. It uses a client/server architecture and a supervisor/worker design pattern to ensure reliability and fault-tolerance.
 
+Repository: https://github.com/LuisSerapicos/SISMD_P2_1230196_ERLANG_CHAT
+
 ## Features
 
 - Clients can join/leave servers and send/receive messages.
@@ -23,7 +25,7 @@ When a client fails, the server notices it and updates the client list, so it wi
 
 - `client.erl`: Handles sending and receiving messages, and joining and leaving servers.
 - `server.erl`: Handles chat messages and maintains a list of connected clients.
-- `router.erl`: Monitors the server processes.
+- `router.erl`: Monitors multiple server processes.
 
 ## Getting Started
 
@@ -38,7 +40,7 @@ When a client fails, the server notices it and updates the client list, so it wi
 3. Compile the modules with `c(Module).` for each module
 4. Start the router with `{ok, RouterPid} = router:start().`
 5. Start a server with `{ok, ServerPid} = server:start(serverName).`
-6. Begin monitoring the server with `router:monitor_server({serverName, 'serverNode@machineName'}).`
+6. Begin monitoring servers with `router:monitor_servers([{serverName, 'serverNode@machineName'}, {serverName2, 'serverNode2@machineName'}]).`
 7. Start a client and connect it to a server `client:connect(serverName, 'serverNode@machineName', clientName).`
 8. Send a message with `client:send_msg(clientName, serverName, 'serverNode@machineName', "message").`
 9. Leave the server with `client:leave(serverName, 'serverNode@machineName', clientName).`

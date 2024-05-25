@@ -41,13 +41,13 @@ send_msg(Client, Server, Node, Message) ->
 %% @param Node The name of the node the server is running on.
 %% @param ClientName The name of the client.
 %% @spec leave(atom(), atom(), atom()) -> ok
-leave(Server, Node, ClientName) ->
-  case whereis(ClientName) of
+leave(Server, Node, Client) ->
+  case whereis(Client) of
     undefined ->
-      io:format("Client ~p not registered~n", [ClientName]);
+      io:format("Client ~p not registered~n", [Client]);
     _Pid ->
-      {Server, Node} ! {ClientName, {leave, ClientName}},
-      io:format("Client ~p left the server ~p on node ~p~n", [ClientName, Server, Node])
+      {Server, Node} ! {Client, {leave, Client}},
+      io:format("Client ~p left the server ~p on node ~p~n", [Client, Server, Node])
   end.
 
 
@@ -56,14 +56,14 @@ leave(Server, Node, ClientName) ->
 %% @param Node The name of the node the server is running on.
 %% @param ClientName The name of the client.
 %% @spec connect(atom(), atom(), atom()) -> ok
-connect(Server, Node, ClientName) ->
-  {ok, ClientName} = start(ClientName),
-  case whereis(ClientName) of
+connect(Server, Node, Client) ->
+  {ok, Client} = start(Client),
+  case whereis(Client) of
     undefined ->
-      io:format("Client ~p not registered~n", [ClientName]);
+      io:format("Client ~p not registered~n", [Client]);
     _Pid ->
-      {Server, Node} ! {ClientName, {connect, ClientName}},
-      io:format("Client ~p connected to the server ~p on node ~p~n", [ClientName, Server, Node])
+      {Server, Node} ! {Client, {connect, Client}},
+      io:format("Client ~p connected to the server ~p on node ~p~n", [Client, Server, Node])
   end.
 
 
