@@ -46,24 +46,37 @@ leave(Server, Node, Client) ->
     undefined ->
       io:format("Client ~p not registered~n", [Client]);
     _Pid ->
-      {Server, Node} ! {Client, {leave, Client}},
-      io:format("Client ~p left the server ~p on node ~p~n", [Client, Server, Node])
+      Client ! {leave, Server, Client, Node}
   end.
 
 
-%% @doc Connects the client to the server on the specified node.
+%% @doc Connects the client to the server.
 %% @param Server The name of the server process.
 %% @param Node The name of the node the server is running on.
-%% @param ClientName The name of the client.
-%% @spec connect(atom(), atom(), atom()) -> ok
+%% @param Client The name of the client process.
+%% @spec connect(atom(), atom(), atom()) -> ok | {error, atom()}
+%% If the server is found (pong) on the remote machine, the client process sends a connect message to the server.
+%% If the server is not found (pang) on the remote machine, the client process prints an error message and returns an error.
 connect(Server, Node, Client) ->
-  {ok, Client} = start(Client),
-  case whereis(Client) of
-    undefined ->
-      io:format("Client ~p not registered~n", [Client]);
-    _Pid ->
-      {Server, Node} ! {Client, {connect, Client}},
-      io:format("Client ~p connected to the server ~p on node ~p~n", [Client, Server, Node])
+  case net_adm:ping(Node) of
+    pong ->
+      ServerPid = rpc:call(Node, erlang, whereis, [Server]),
+      case ServerPid of
+        undefined ->
+          io:format("Server ~p not found on node ~p~n", [Server, Node]),
+          {error, server_not_found};
+        _ ->
+          case whereis(Client) of
+            undefined ->
+              io:format("Client ~p not registered~n", [Client]),
+              {error, client_not_registered};
+            ClientPid ->
+              ClientPid ! {connect, Server, Client, Node}
+          end
+      end;
+    pang ->
+      io:format("Node ~p is down, cannot connect client ~p~n", [Node, Client]),
+      {error, node_down}
   end.
 
 
@@ -80,10 +93,18 @@ loop() ->
         {_, Reply} -> io:format("Message received from server: ~p~n", [Reply])
       end,
       loop();
-    {leave} ->
-      io:format("Client leaving...~n"),
-      exit(normal);
-    {connect, Server} ->
+    {leave, Server, Client, Node} ->
+      {Server, Node} ! {self(), {leave, Client}},
+      receive
+        {_, Reply} -> io:format("Client left server ~p on node ~p: ~p~n", [Server, Node, Reply])
+      end,
+      %%exit(normal);
+      loop();
+    {connect, Server, Client, Node} ->
+      {Server, Node} ! {self(), {connect, Client}},
+      receive
+        {_, Reply} -> io:format("Connected to server ~p on node ~p: ~p~n", [Server, Node, Reply])
+      end,
       loop()
   end.
 

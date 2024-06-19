@@ -41,10 +41,13 @@ When a client fails, the server notices it and updates the client list, so it wi
 4. Start the router with `{ok, RouterPid} = router:start().`
 5. Start a server with `{ok, ServerPid} = server:start(serverName).`
 6. Begin monitoring servers with `router:monitor_servers([{serverName, 'serverNode@machineName'}, {serverName2, 'serverNode2@machineName'}]).`
-7. Start a client and connect it to a server `client:connect(serverName, 'serverNode@machineName', clientName).`
-8. Send a message with `client:send_msg(clientName, serverName, 'serverNode@machineName', "message").`
-9. Leave the server with `client:leave(serverName, 'serverNode@machineName', clientName).`
-10. Repeat steps 6-9 to add more clients to the server
+7. Start a client `client:start(clientName).`
+8. Connect the client to a server `client:connect(serverName, 'serverNode@machineName', clientName).`
+9. Send a message with `client:send_msg(clientName, serverName, 'serverNode@machineName', "message").`
+10. Leave the server with `client:leave(serverName, 'serverNode@machineName', clientName).`
+11. Repeat steps 6-9 to add more clients to the server
+12. To test the fault-tolerance, kill the server process with `exit(whereis(serverName), kill).` and see the router create a new server process.
+13. Check router logs to see the server recovery process and use `observer:start().` in the server node to check the server process.
 
 ## Built With
 

@@ -72,7 +72,7 @@ monitor_server({Server, Node}, Ref) ->
           NewRef = erlang:monitor(process, {Server, Node}),
           monitor_loop(Server, Node, NewRef);
         _ ->
-          %% A monitor already exists, do not create a new one
+          %% Monitor exists, dont create a new one
           monitor_loop(Server, Node, Ref)
       end
   end.
@@ -89,12 +89,14 @@ monitor_loop(Server, Node, Ref) ->
     {'DOWN', Ref, process, _, Reason} ->
       io:format("Server ~p exited with reason ~p~n", [Server, Reason]),
       {Messages, Clients} = load_state_from_ets(Server),  %% Load the state from ETS
-      {ok, NewServerPid} = rpc:call(Node, server, start, [Server]),
-      NewServerPid ! {restore_state, {Messages, Clients}}, %% Send the restore state message to the new server
-      receive
-        {state_restored, NewServerPid} ->
-          erlang:unlink(NewServerPid), %% Unlink the server process before it exits
-          monitor_server({Server, Node}, Ref)
+      case rpc:call(Node, server, start, [Server]) of
+        {badrpc, nodedown} ->
+          io:format("Node ~p is down, cannot start server ~p~n", [Node, Server]);
+        {ok, NewServerPid} ->
+          NewServerPid ! {restore_state, {Messages, Clients}}, %% Send the restore state message to the new server
+          io:format("State restored for ~p, NewServerPid ~p~n", [Server, NewServerPid]),
+          NewRef = erlang:monitor(process, NewServerPid), %% Update the monitor reference with the new server PID
+          monitor_server({Server, Node}, NewRef)
       end;
     _ ->
       monitor_loop(Server, Node, Ref)
